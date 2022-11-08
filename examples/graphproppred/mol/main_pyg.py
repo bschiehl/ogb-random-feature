@@ -101,7 +101,7 @@ def main():
     print("Loading dataset")
     ### automatic dataloading and splitting
     if args.randomFeature:
-        transform = RandomFeature()
+        transform = RandomFeature(percent=100.0, dist="uniform", unif_range=(0.0, 100.0))
         dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
         dat1 = dataset[0]
         print(dat1)

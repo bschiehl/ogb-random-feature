@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 import torch
 
@@ -16,8 +16,12 @@ class RandomFeature(BaseTransform):
             The remaining features are extended deterministically by the sum of the original features.
             (default: :obj:`100.0`)
         dist (str, optional): Distribution to sample the random values from. Options: 
-            "normal": standard normal distribution, "uniform": uniform distribution on [-1, 1]
+            "normal": normal distribution, "uniform": uniform distribution on [a, b]
             (default: "normal")
+        normal_parameters (tuple(float, float), optional): Mean and standard deviation of 
+            the normal distribution. (default: :obj:`(0,1)`)
+        unif_range (tuple(float, float), optional): Range of the uniform distribution.
+            (default: :obj:`(-1,1)`)
         cat (bool, optional): If set to :obj:`False`, existing node features
             will be replaced. (default: :obj:`True`)
         node_types (str or List[str], optional): The specified node type(s) to
@@ -29,6 +33,8 @@ class RandomFeature(BaseTransform):
         self,
         percent: float = 100.0,
         dist: str = "normal",
+        normal_parameters: Tuple[float, float] = (0.0,1.0),
+        unif_range: Tuple[float, float] = (-1.0, 1.0),
         cat: bool = True,
         node_types: Optional[Union[str, List[str]]] = None,
     ):
@@ -37,6 +43,8 @@ class RandomFeature(BaseTransform):
 
         self.percent = percent
         self.dist = dist
+        self.normal_parameters = normal_parameters
+        self.unif_range = unif_range
         self.cat = cat
         self.node_types = node_types
 
@@ -49,9 +57,13 @@ class RandomFeature(BaseTransform):
             if self.node_types is None or store._key in self.node_types:
                 num_nodes = store.num_nodes
                 if (self.dist == "uniform"):
-                    c = 2 * torch.rand((num_nodes, 1), dtype=torch.float) - 1
+                    c = (self.unif_range[1] - self.unif_range[0]) * torch.rand((num_nodes, 1), dtype=torch.float) + self.unif_range[0]
+                elif(self.dist == "normal"):
+                    means = torch.full((num_nodes, 1), self.normal_parameters[0])
+                    stds = torch.full((num_nodes, 1), self.normal_parameters[1])
+                    c = torch.normal(means, stds).float()
                 else:
-                    c = torch.randn((num_nodes, 1), dtype=torch.float)
+                    raise ValueError("Invalid distribution")
 
                 if hasattr(store, 'x') and self.cat:
                     mask = torch.rand((num_nodes, 1), dtype=torch.float).ge(self.percent / 100)

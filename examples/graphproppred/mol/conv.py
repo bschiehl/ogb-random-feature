@@ -2,7 +2,7 @@ import torch
 from torch_geometric.nn import MessagePassing
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool, global_add_pool
-from ogb.graphproppred.mol_encoder import AtomEncoder,BondEncoder
+from ....ogb.graphproppred.mol_encoder import AtomEncoder,BondEncoder
 from torch_geometric.utils import degree
 
 import math

@@ -15,10 +15,14 @@ class AtomEncoder(torch.nn.Module):
             emb = torch.nn.Embedding(dim, emb_dim)
             torch.nn.init.xavier_uniform_(emb.weight.data)
             self.atom_embedding_list.append(emb)
-
+        emb = torch.nn.Embedding(100, emb_dim)
+        self.atom_embedding_list.append(emb)
+        
     def forward(self, x):
+        #print("Modified AtomEncoder")
         x_embedding = 0
         for i in range(x.shape[1]):
+            # shape (num_nodes, emb_dim)
             x_embedding += self.atom_embedding_list[i](x[:,i])
 
         return x_embedding
