@@ -3,6 +3,8 @@ build/
 dist/
 *.egg-info/
 dataset/
+data/
+results/
 *.swp
 *.vscode
 *.DS_Store
