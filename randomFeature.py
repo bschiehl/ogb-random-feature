@@ -68,7 +68,8 @@ class RandomFeature(BaseTransform):
                     c = torch.normal(means, stds).float()
                 else:
                     raise ValueError("Invalid distribution")
-                c = c % self.max_val
+                if self.max_val is not None:
+                    c = c % self.max_val
 
                 if hasattr(store, 'x') and self.cat:
                     mask = torch.rand((num_nodes, 1), dtype=torch.float).ge(self.percent / 100)
@@ -76,7 +77,8 @@ class RandomFeature(BaseTransform):
                     s = torch.sum(x, 1).view(-1,1).float()
                     # another possibility: map [A,B] --> [a,b] with (x - A) * (b-a)/(B-A) + a
                     # A = min(s), B = max(s)
-                    s = s % self.max_val
+                    if self.max_val is not None:
+                        s = s % self.max_val
                     c[mask] = s[mask]
                     store.x = torch.cat([x, c.to(x.device, x.dtype)], dim=-1)
                 else:
