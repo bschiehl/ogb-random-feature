@@ -28,6 +28,8 @@ class RandomFeature(BaseTransform):
             append constant values for if used on heterogeneous graphs.
             If set to :obj:`None`, constants will be added to each node feature
             :obj:`x` for all existing node types. (default: :obj:`None`)
+        max_val (int, optional): Value to cap random values at.
+            (default: :obj:`None`)
     """
     def __init__(
         self,
@@ -37,6 +39,7 @@ class RandomFeature(BaseTransform):
         unif_range: Tuple[float, float] = (-1.0, 1.0),
         cat: bool = True,
         node_types: Optional[Union[str, List[str]]] = None,
+        max_val: int = None
     ):
         if isinstance(node_types, str):
             node_types = [node_types]
@@ -47,6 +50,7 @@ class RandomFeature(BaseTransform):
         self.unif_range = unif_range
         self.cat = cat
         self.node_types = node_types
+        self.max_val = max_val
 
     def __call__(
         self,
@@ -59,16 +63,20 @@ class RandomFeature(BaseTransform):
                 if (self.dist == "uniform"):
                     c = (self.unif_range[1] - self.unif_range[0]) * torch.rand((num_nodes, 1), dtype=torch.float) + self.unif_range[0]
                 elif(self.dist == "normal"):
-                    means = torch.full((num_nodes, 1), self.normal_parameters[0])
-                    stds = torch.full((num_nodes, 1), self.normal_parameters[1])
+                    means = torch.full((num_nodes, 1), self.normal_parameters[0]).float()
+                    stds = torch.full((num_nodes, 1), self.normal_parameters[1]).float()
                     c = torch.normal(means, stds).float()
                 else:
                     raise ValueError("Invalid distribution")
+                c = c % self.max_val
 
                 if hasattr(store, 'x') and self.cat:
                     mask = torch.rand((num_nodes, 1), dtype=torch.float).ge(self.percent / 100)
                     x = store.x.view(-1, 1) if store.x.dim() == 1 else store.x
                     s = torch.sum(x, 1).view(-1,1).float()
+                    # another possibility: map [A,B] --> [a,b] with (x - A) * (b-a)/(B-A) + a
+                    # A = min(s), B = max(s)
+                    s = s % self.max_val
                     c[mask] = s[mask]
                     store.x = torch.cat([x, c.to(x.device, x.dtype)], dim=-1)
                 else:

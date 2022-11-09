@@ -93,15 +93,20 @@ def main():
     parser.add_argument('--filename', type=str, default="",
                         help='filename to output result (default: )')
     parser.add_argument('--randomFeature', type=bool, default=False, 
-                        help='whether to add random features')
+                        help='whether to add random features (default: False)')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Random seed (default: None)')
     args = parser.parse_args()
 
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+    
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
 
     print("Loading dataset")
     ### automatic dataloading and splitting
     if args.randomFeature:
-        transform = RandomFeature(percent=100.0, dist="uniform", unif_range=(0.0, 100.0))
+        transform = RandomFeature(percent=100.0, dist="normal", normal_parameters=(50, 10), max_val=100)
         dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
         dat1 = dataset[0]
         print(dat1)
