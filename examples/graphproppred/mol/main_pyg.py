@@ -92,7 +92,7 @@ def main():
                         help='full feature or simple feature')
     parser.add_argument('--filename', type=str, default="",
                         help='filename to output result (default: )')
-    parser.add_argument('--randomFeature', type=bool, default=False, 
+    parser.add_argument('--randomFeature', action=argparse.BooleanOptionalAction,
                         help='whether to add random features (default: False)')
     parser.add_argument('--seed', type=int, default=None,
                         help='Random seed (default: None)')
@@ -106,7 +106,7 @@ def main():
     print("Loading dataset")
     ### automatic dataloading and splitting
     if args.randomFeature:
-        transform = RandomFeature(percent=100.0, dist="normal", normal_parameters=(50, 10), max_val=100)
+        transform = RandomFeature(percent=100.0, dist="uniform", normal_parameters=(50.0, 10.0), unif_range=(0.0, 100.0), max_val=100)
         dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
         dat1 = dataset[0]
         print(dat1)
