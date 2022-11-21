@@ -93,9 +93,11 @@ def main():
     parser.add_argument('--filename', type=str, default="",
                         help='filename to output result (default: )')
     parser.add_argument('--randomFeature', action=argparse.BooleanOptionalAction,
-                        help='whether to add random features (default: False)')
+                        help='whether to add random features')
     parser.add_argument('--seed', type=int, default=None,
                         help='Random seed (default: None)')
+    parser.add_argument('--randomEmbedding', action=argparse.BooleanOptionalAction, 
+                        help='Create an extra embedding for the random features instead of appending random features to existing embeddings')
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -105,15 +107,35 @@ def main():
 
     print("Loading dataset")
     ### automatic dataloading and splitting
-    if args.randomFeature:
-        transform = RandomFeature(percent=100.0, dist="uniform", normal_parameters=(50.0, 10.0), unif_range=(0.0, 100.0), max_val=100)
+
+    rfParams = dict()
+    rfParams['percent'] = 100.0
+    rfParams['dist'] = "uniform"
+    rfParams['normal_params'] = (50.0, 10.0)
+    rfParams['unif_range'] = (0.0, 100.0)
+    rfParams['max_val'] = 100
+    rfParams['num_rf'] = 1
+
+    if args.randomFeature and args.randomEmbedding:
+        transform = RandomFeature(percent=rfParams['percent'], 
+        dist=rfParams['dist'], 
+        normal_parameters=rfParams['normal_params'], 
+        unif_range=rfParams['unif_range'], 
+        max_val=rfParams['max_val'])
+
         dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
+        
         dat1 = dataset[0]
         print(dat1)
+        rfParams['emb'] = True
     else:
         dataset = PygGraphPropPredDataset(name = args.dataset)
         dat1 = dataset[0]
         print(dat1)
+        if args.randomFeature:
+            rfParams['emb'] = False
+        else: 
+            rfParams = None
 
     if args.feature == 'full':
         pass 
@@ -133,7 +155,7 @@ def main():
     test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
 
     if args.gnn == 'gin':
-        model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False, rfParams=rfParams).to(device)
     elif args.gnn == 'gin-virtual':
         model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
     elif args.gnn == 'gcn':

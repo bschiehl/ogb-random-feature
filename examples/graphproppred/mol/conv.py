@@ -70,7 +70,7 @@ class GNN_node(torch.nn.Module):
     Output:
         node representations
     """
-    def __init__(self, num_layer, emb_dim, drop_ratio = 0.5, JK = "last", residual = False, gnn_type = 'gin'):
+    def __init__(self, num_layer, emb_dim, drop_ratio = 0.5, JK = "last", residual = False, gnn_type = 'gin', rfParams=None):
         '''
             emb_dim (int): node embedding dimensionality
             num_layer (int): number of GNN message passing layers
@@ -87,7 +87,7 @@ class GNN_node(torch.nn.Module):
         if self.num_layer < 2:
             raise ValueError("Number of GNN layers must be greater than 1.")
 
-        self.atom_encoder = AtomEncoder(emb_dim)
+        self.atom_encoder = AtomEncoder(emb_dim, rfParams)
 
         ###List of GNNs
         self.convs = torch.nn.ModuleList()

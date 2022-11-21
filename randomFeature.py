@@ -12,8 +12,8 @@ class RandomFeature(BaseTransform):
     r"""Appends a random value to some percentage of node features :obj:`x`
     (functional name: :obj:`random`).
     Args:
-        percent (float, optional): percentage of nodes whose features should be extended by a random value. 
-            The remaining features are extended deterministically by the sum of the original features.
+        percent (float, optional): percentage of nodes whose features should be extended by random values. 
+            The remaining features are extended firstly by the sum of the original features and then by constant zeros.
             (default: :obj:`100.0`)
         dist (str, optional): Distribution to sample the random values from. Options: 
             "normal": normal distribution, "uniform": uniform distribution on [a, b]
@@ -30,6 +30,8 @@ class RandomFeature(BaseTransform):
             :obj:`x` for all existing node types. (default: :obj:`None`)
         max_val (int, optional): Value to cap random values at.
             (default: :obj:`None`)
+        num_rf (int, optional): Number of random features to append.
+            (default: :obj:`1`)
     """
     def __init__(
         self,
@@ -39,7 +41,8 @@ class RandomFeature(BaseTransform):
         unif_range: Tuple[float, float] = (-1.0, 1.0),
         cat: bool = True,
         node_types: Optional[Union[str, List[str]]] = None,
-        max_val: int = None
+        max_val: int = None,
+        num_rf: int = 1
     ):
         if isinstance(node_types, str):
             node_types = [node_types]
@@ -51,6 +54,7 @@ class RandomFeature(BaseTransform):
         self.cat = cat
         self.node_types = node_types
         self.max_val = max_val
+        self.num_rf = num_rf
 
     def __call__(
         self,
@@ -61,10 +65,10 @@ class RandomFeature(BaseTransform):
             if self.node_types is None or store._key in self.node_types:
                 num_nodes = store.num_nodes
                 if (self.dist == "uniform"):
-                    c = (self.unif_range[1] - self.unif_range[0]) * torch.rand((num_nodes, 1), dtype=torch.float) + self.unif_range[0]
+                    c = (self.unif_range[1] - self.unif_range[0]) * torch.rand((num_nodes, self.num_rf), dtype=torch.float) + self.unif_range[0]
                 elif(self.dist == "normal"):
-                    means = torch.full((num_nodes, 1), self.normal_parameters[0]).float()
-                    stds = torch.full((num_nodes, 1), self.normal_parameters[1]).float()
+                    means = torch.full((num_nodes, self.num_rf), self.normal_parameters[0]).float()
+                    stds = torch.full((num_nodes, self.num_rf), self.normal_parameters[1]).float()
                     c = torch.normal(means, stds).float()
                 else:
                     raise ValueError("Invalid distribution")
@@ -72,9 +76,11 @@ class RandomFeature(BaseTransform):
                     c = c % self.max_val
 
                 if hasattr(store, 'x') and self.cat:
-                    mask = torch.rand((num_nodes, 1), dtype=torch.float).ge(self.percent / 100)
+                    mask = torch.rand((num_nodes, self.num_rf), dtype=torch.float).ge(self.percent / 100)
                     x = store.x.view(-1, 1) if store.x.dim() == 1 else store.x
                     s = torch.sum(x, 1).view(-1,1).float()
+                    z = torch.zeros((num_nodes, self.num_rf - 1))
+                    s = torch.concat((s, z), 1)
                     # another possibility: map [A,B] --> [a,b] with (x - A) * (b-a)/(B-A) + a
                     # A = min(s), B = max(s)
                     if self.max_val is not None:
