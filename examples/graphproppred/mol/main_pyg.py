@@ -98,6 +98,7 @@ def main():
                         help='Random seed (default: None)')
     parser.add_argument('--randomEmbedding', action=argparse.BooleanOptionalAction, 
                         help='Create an extra embedding for the random features instead of appending random features to existing embeddings')
+    parser.add_argument('--repetitions', type=int, default=1, help='Number of models to train')
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -146,64 +147,69 @@ def main():
         dataset.data.edge_attr = dataset.data.edge_attr[:,:2]
 
     split_idx = dataset.get_idx_split()
-
-    ### automatic evaluator. takes dataset name as input
-    evaluator = Evaluator(args.dataset)
-
-    train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
-    valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
-    test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
-
-    if args.gnn == 'gin':
-        model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False, rfParams=rfParams).to(device)
-    elif args.gnn == 'gin-virtual':
-        model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    elif args.gnn == 'gcn':
-        model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-    elif args.gnn == 'gcn-virtual':
-        model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    else:
-        raise ValueError('Invalid GNN type')
-
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    valid_curve = []
-    test_curve = []
-    train_curve = []
-
     print("Continue training [y/n]?")
-    
     if input() == "y":
-        for epoch in range(1, args.epochs + 1):
-            print("=====Epoch {}".format(epoch))
-            print('Training...')
-            train(model, device, train_loader, optimizer, dataset.task_type)
+        for i in range(args.repetitions):
+            ### automatic evaluator. takes dataset name as input
+            evaluator = Evaluator(args.dataset)
 
-            print('Evaluating...')
-            train_perf = eval(model, device, train_loader, evaluator)
-            valid_perf = eval(model, device, valid_loader, evaluator)
-            test_perf = eval(model, device, test_loader, evaluator)
+            train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
+            valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
+            test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
 
-            print({'Train': train_perf, 'Validation': valid_perf, 'Test': test_perf})
+            if args.gnn == 'gin':
+                model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False, rfParams=rfParams).to(device)
+            elif args.gnn == 'gin-virtual':
+                model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+            elif args.gnn == 'gcn':
+                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+            elif args.gnn == 'gcn-virtual':
+                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+            else:
+                raise ValueError('Invalid GNN type')
 
-            train_curve.append(train_perf[dataset.eval_metric])
-            valid_curve.append(valid_perf[dataset.eval_metric])
-            test_curve.append(test_perf[dataset.eval_metric])
+            optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-        if 'classification' in dataset.task_type:
-            best_val_epoch = np.argmax(np.array(valid_curve))
-            best_train = max(train_curve)
-        else:
-            best_val_epoch = np.argmin(np.array(valid_curve))
-            best_train = min(train_curve)
+            valid_curve = []
+            test_curve = []
+            train_curve = []
 
-        print('Finished training!')
-        print('Best validation score: {}'.format(valid_curve[best_val_epoch]))
-        print('Test score: {}'.format(test_curve[best_val_epoch]))
+            for epoch in range(1, args.epochs + 1):
+                print("=====Epoch {}".format(epoch))
+                print('Training...')
+                train(model, device, train_loader, optimizer, dataset.task_type)
 
-        if not args.filename == '':
-            torch.save({'Val': valid_curve[best_val_epoch], 'Test': test_curve[best_val_epoch], 'Train': train_curve[best_val_epoch], 'BestTrain': best_train}, args.filename)
+                print('Evaluating...')
+                train_perf = eval(model, device, train_loader, evaluator)
+                valid_perf = eval(model, device, valid_loader, evaluator)
+                test_perf = eval(model, device, test_loader, evaluator)
 
+                print({'Train': train_perf, 'Validation': valid_perf, 'Test': test_perf})
+
+                train_curve.append(train_perf[dataset.eval_metric])
+                valid_curve.append(valid_perf[dataset.eval_metric])
+                test_curve.append(test_perf[dataset.eval_metric])
+
+            if 'classification' in dataset.task_type:
+                best_val_epoch = np.argmax(np.array(valid_curve))
+                best_train = max(train_curve)
+            else:
+                best_val_epoch = np.argmin(np.array(valid_curve))
+                best_train = min(train_curve)
+
+            print('Finished training!')
+            print('Best validation score: {}'.format(valid_curve[best_val_epoch]))
+            print('Test score: {}'.format(test_curve[best_val_epoch]))
+
+            if not args.filename == '':
+                if args.repetitions > 1:
+                    filename = args.filename + "_{}.pt".format(i)
+                else:
+                    filename = args.filename
+                torch.save({'Val': valid_curve[best_val_epoch], 'Test': test_curve[best_val_epoch], 'Train': train_curve[best_val_epoch], 'BestTrain': best_train}, filename)
+
+
+    
 
 if __name__ == "__main__":
     main()
