@@ -27,12 +27,13 @@ class AtomEncoder(torch.nn.Module):
     def forward(self, x):
         x_embedding = 0
         for i in range(x.shape[1]):
-            # shape (num_nodes, emb_dim)
+            # shape (x.shape[0], emb_dim)
             x_embedding += self.atom_embedding_list[i](x[:,i])
             
         if self.rfParams is not None and not self.rfParams['emb']:
             rand = self.__sample(x.shape[0])
             x_embedding = torch.concat((x_embedding, rand.to(x_embedding.device, x_embedding.dtype)), dim=-1)
+            
         return x_embedding
 
     def __sample(self, num_nodes):

@@ -32,6 +32,8 @@ class RandomFeature(BaseTransform):
             (default: :obj:`None`)
         num_rf (int, optional): Number of random features to append.
             (default: :obj:`1`)
+        replace (bool, optional): If set to :obj:`True`, the last num_rf node features will be
+            replaced by random features (default: :obj:`False`)
     """
     def __init__(
         self,
@@ -42,7 +44,8 @@ class RandomFeature(BaseTransform):
         cat: bool = True,
         node_types: Optional[Union[str, List[str]]] = None,
         max_val: int = None,
-        num_rf: int = 1
+        num_rf: int = 1,
+        replace: bool = False
     ):
         if isinstance(node_types, str):
             node_types = [node_types]
@@ -55,6 +58,7 @@ class RandomFeature(BaseTransform):
         self.node_types = node_types
         self.max_val = max_val
         self.num_rf = num_rf
+        self.replace = replace
 
     def __call__(
         self,
@@ -86,7 +90,10 @@ class RandomFeature(BaseTransform):
                     if self.max_val is not None:
                         s = s % self.max_val
                     c[mask] = s[mask]
-                    store.x = torch.cat([x, c.to(x.device, x.dtype)], dim=-1)
+                    if self.replace:
+                        store.x[:, -self.num_rf:] = c
+                    else:
+                        store.x = torch.cat([x, c.to(x.device, x.dtype)], dim=-1)
                 else:
                     store.x = c
 
