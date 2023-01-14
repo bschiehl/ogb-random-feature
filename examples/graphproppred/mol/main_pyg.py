@@ -99,6 +99,7 @@ def main():
     parser.add_argument('--randomEmbedding', action=argparse.BooleanOptionalAction, 
                         help='Create an extra embedding for the random features instead of appending random features to existing embeddings')
     parser.add_argument('--repetitions', type=int, default=1, help='Number of models to train')
+    parser.add_argument('--replace', action=argparse.BooleanOptionalAction, help='Sample new random features to replace the old ones in each epoch')
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -113,8 +114,8 @@ def main():
     rfParams['percent'] = 100.0
     rfParams['dist'] = "uniform"
     rfParams['normal_params'] = (50.0, 10.0)
-    rfParams['unif_range'] = (0.0, 100.0)
-    rfParams['max_val'] = 100
+    rfParams['unif_range'] = (0.0, 200.0)
+    rfParams['max_val'] = 200
     rfParams['num_rf'] = 1
 
     if args.randomFeature and args.randomEmbedding:
@@ -175,6 +176,11 @@ def main():
             train_curve = []
 
             for epoch in range(1, args.epochs + 1):
+                if args.replace:
+                    dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
+                    train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
+                    valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
+                    test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
                 print("=====Epoch {}".format(epoch))
                 print('Training...')
                 train(model, device, train_loader, optimizer, dataset.task_type)

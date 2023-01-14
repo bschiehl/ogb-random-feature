@@ -33,7 +33,7 @@ class AtomEncoder(torch.nn.Module):
         if self.rfParams is not None and not self.rfParams['emb']:
             rand = self.__sample(x.shape[0])
             x_embedding = torch.concat((x_embedding, rand.to(x_embedding.device, x_embedding.dtype)), dim=-1)
-            
+        
         return x_embedding
 
     def __sample(self, num_nodes):

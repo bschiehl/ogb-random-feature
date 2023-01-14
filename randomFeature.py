@@ -30,7 +30,7 @@ class RandomFeature(BaseTransform):
             :obj:`x` for all existing node types. (default: :obj:`None`)
         max_val (int, optional): Value to cap random values at.
             (default: :obj:`None`)
-        num_rf (int, optional): Number of random features to append.
+        num_rf (int, optional): Number of random features to append. If "all", it is the number of regular features.
             (default: :obj:`1`)
         replace (bool, optional): If set to :obj:`True`, the last num_rf node features will be
             replaced by random features (default: :obj:`False`)
@@ -44,7 +44,7 @@ class RandomFeature(BaseTransform):
         cat: bool = True,
         node_types: Optional[Union[str, List[str]]] = None,
         max_val: int = None,
-        num_rf: int = 1,
+        num_rf: Optional[Union[str, int]] = 1,
         replace: bool = False
     ):
         if isinstance(node_types, str):
@@ -64,8 +64,11 @@ class RandomFeature(BaseTransform):
         self,
         data: Union[Data, HeteroData],
     ) -> Union[Data, HeteroData]:
-
         for store in data.node_stores:
+            if self.num_rf == "all":
+                if not hasattr(store, 'x'):
+                    raise ValueError("No node features found")
+                self.num_rf = store.x.shape[1]
             if self.node_types is None or store._key in self.node_types:
                 num_nodes = store.num_nodes
                 if (self.dist == "uniform"):
