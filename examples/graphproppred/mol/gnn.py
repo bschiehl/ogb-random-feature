@@ -11,7 +11,7 @@ from torch_scatter import scatter_mean
 class GNN(torch.nn.Module):
 
     def __init__(self, num_tasks, num_layer = 5, emb_dim = 300, 
-                    gnn_type = 'gin', virtual_node = True, residual = False, drop_ratio = 0.5, JK = "last", graph_pooling = "mean", rfParams=None):
+                    gnn_type = 'gin', virtual_node = True, residual = False, drop_ratio = 0.5, JK = "last", graph_pooling = "mean", rfParams=None, gnn2 = False):
         '''
             num_tasks (int): number of labels to be predicted
             virtual_node (bool): whether to add virtual node or not
@@ -25,15 +25,20 @@ class GNN(torch.nn.Module):
         self.emb_dim = emb_dim
         self.num_tasks = num_tasks
         self.graph_pooling = graph_pooling
+        self.gnn2 = gnn2
 
         if self.num_layer < 2:
             raise ValueError("Number of GNN layers must be greater than 1.")
 
         ### GNN to generate node embeddings
+        if self.gnn2:
+            self.gnn_node_1 = GNN_node(num_layer, 16, JK=JK, drop_ratio = drop_ratio, residual = residual, gnn_type = gnn_type, rfParams=rfParams, gnn2=True)
         if virtual_node:
-            self.gnn_node = GNN_node_Virtualnode(num_layer, emb_dim, JK = JK, drop_ratio = drop_ratio, residual = residual, gnn_type = gnn_type)
+            self.gnn_node = GNN_node_Virtualnode(num_layer, emb_dim, JK = JK, drop_ratio = drop_ratio, residual = residual, gnn_type = gnn_type, rfParams=rfParams)
         else:
             self.gnn_node = GNN_node(num_layer, emb_dim, JK = JK, drop_ratio = drop_ratio, residual = residual, gnn_type = gnn_type, rfParams=rfParams)
+        
+        
 
 
         ### Pooling function to generate whole-graph embeddings
@@ -55,7 +60,12 @@ class GNN(torch.nn.Module):
         else:
             self.graph_pred_linear = torch.nn.Linear(self.emb_dim, self.num_tasks)
 
-    def forward(self, batched_data):
+    def forward(self, batched_data, batched_trans = None):
+        #print(batched_data)
+        if self.gnn2:
+            h_node_1 = self.gnn_node_1(batched_trans)
+            batched_data.x = torch.abs(torch.cat((batched_data.x, h_node_1.to(batched_data.x.device, batched_data.x.dtype)), dim=1))
+        #print(batched_data)
         h_node = self.gnn_node(batched_data)
 
         h_graph = self.pool(h_node, batched_data.batch)

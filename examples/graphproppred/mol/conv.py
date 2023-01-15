@@ -2,7 +2,7 @@ import torch
 from torch_geometric.nn import MessagePassing
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool, global_add_pool
-from ....ogb.graphproppred.mol_encoder import AtomEncoder,BondEncoder
+from ....ogb.graphproppred.mol_encoder import AtomEncoder,BondEncoder, RFEncoder
 from torch_geometric.utils import degree
 
 import math
@@ -70,7 +70,7 @@ class GNN_node(torch.nn.Module):
     Output:
         node representations
     """
-    def __init__(self, num_layer, emb_dim, drop_ratio = 0.5, JK = "last", residual = False, gnn_type = 'gin', rfParams=None):
+    def __init__(self, num_layer, emb_dim, drop_ratio = 0.5, JK = "last", residual = False, gnn_type = 'gin', rfParams=None, gnn2=False):
         '''
             emb_dim (int): node embedding dimensionality
             num_layer (int): number of GNN message passing layers
@@ -81,6 +81,7 @@ class GNN_node(torch.nn.Module):
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
         self.JK = JK
+        self.gnn2 = gnn2
         ### add residual connection or not
         self.residual = residual
 
@@ -88,6 +89,7 @@ class GNN_node(torch.nn.Module):
             raise ValueError("Number of GNN layers must be greater than 1.")
 
         self.atom_encoder = AtomEncoder(emb_dim, rfParams)
+        self.rf_encoder = RFEncoder(emb_dim, rfParams)
 
         ###List of GNNs
         self.convs = torch.nn.ModuleList()
@@ -107,8 +109,11 @@ class GNN_node(torch.nn.Module):
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
 
         ### computing input node embedding
+        if self.gnn2:
+            h_list = [self.rf_encoder(x)]
+        else:
+            h_list = [self.atom_encoder(x)]
 
-        h_list = [self.atom_encoder(x)]
         for layer in range(self.num_layer):
 
             h = self.convs[layer](h_list[layer], edge_index, edge_attr)

@@ -20,16 +20,21 @@ from ....randomFeature import RandomFeature
 cls_criterion = torch.nn.BCEWithLogitsLoss()
 reg_criterion = torch.nn.MSELoss()
 
-def train(model, device, loader, optimizer, task_type):
+def train(model, device, loader, optimizer, task_type, trans_loader = None):
     model.train()
-
+    if trans_loader is not None:
+        trans_iter = iter(trans_loader)
     for step, batch in enumerate(tqdm(loader, desc="Iteration")):
         batch = batch.to(device)
-
+        if trans_loader is not None:
+            trans_batch = next(trans_iter).to(device)
         if batch.x.shape[0] == 1 or batch.batch[-1] == 0:
             pass
         else:
-            pred = model(batch)
+            if trans_loader is not None:
+                pred = model(batch, trans_batch)
+            else:
+                pred = model(batch)
             optimizer.zero_grad()
             ## ignore nan targets (unlabeled) when computing training loss.
             is_labeled = batch.y == batch.y
@@ -40,19 +45,24 @@ def train(model, device, loader, optimizer, task_type):
             loss.backward()
             optimizer.step()
 
-def eval(model, device, loader, evaluator):
+def eval(model, device, loader, evaluator, trans_loader = None):
     model.eval()
     y_true = []
     y_pred = []
-
+    if trans_loader is not None:
+        trans_iter = iter(trans_loader)
     for step, batch in enumerate(tqdm(loader, desc="Iteration")):
         batch = batch.to(device)
-
+        if trans_loader is not None:
+            trans_batch = next(trans_iter).to(device)
         if batch.x.shape[0] == 1:
             pass
         else:
             with torch.no_grad():
-                pred = model(batch)
+                if trans_loader is not None:
+                    pred = model(batch, trans_batch)
+                else:
+                    pred = model(batch)
 
             y_true.append(batch.y.view(pred.shape).detach().cpu())
             y_pred.append(pred.detach().cpu())
@@ -72,7 +82,7 @@ def main():
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
     parser.add_argument('--gnn', type=str, default='gin-virtual',
-                        help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
+                        help='GNN gin, gin-virtual, gnn2, or gcn, or gcn-virtual (default: gin-virtual)')
     parser.add_argument('--drop_ratio', type=float, default=0.5,
                         help='dropout ratio (default: 0.5)')
     parser.add_argument('--num_layer', type=int, default=5,
@@ -114,8 +124,8 @@ def main():
     rfParams['percent'] = 100.0
     rfParams['dist'] = "uniform"
     rfParams['normal_params'] = (50.0, 10.0)
-    rfParams['unif_range'] = (0.0, 200.0)
-    rfParams['max_val'] = 200
+    rfParams['unif_range'] = (0.0, 100.0)
+    rfParams['max_val'] = 100
     rfParams['num_rf'] = 1
 
     if args.randomFeature and args.randomEmbedding:
@@ -127,17 +137,30 @@ def main():
 
         dataset = PygGraphPropPredDataset(name = args.dataset, transform=transform)
         
-        dat1 = dataset[0]
-        print(dat1)
         rfParams['emb'] = True
-    else:
+    elif args.randomFeature:
         dataset = PygGraphPropPredDataset(name = args.dataset)
+        rfParams['emb'] = False
+    elif args.gnn == 'gnn2':
+        transform = RandomFeature(percent=rfParams['percent'],
+        dist= rfParams['dist'],
+        normal_parameters= rfParams['normal_params'],
+        unif_range= rfParams['unif_range'],
+        max_val=rfParams['max_val'],
+        num_rf="all",
+        replace=True)
+        
+        dataset = PygGraphPropPredDataset(name = args.dataset)
+        trans_data = PygGraphPropPredDataset(name=args.dataset, transform=transform)
         dat1 = dataset[0]
-        print(dat1)
-        if args.randomFeature:
-            rfParams['emb'] = False
-        else: 
-            rfParams = None
+        rfParams['num_rf'] = 16
+        rfParams['emb'] = True
+    else: 
+        dataset = PygGraphPropPredDataset(name = args.dataset)
+        rfParams = None
+
+    dat1 = dataset[0]
+    print(dat1)
 
     if args.feature == 'full':
         pass 
@@ -154,18 +177,27 @@ def main():
             ### automatic evaluator. takes dataset name as input
             evaluator = Evaluator(args.dataset)
 
-            train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
+            if args.gnn == 'gnn2':
+                train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
+                trans_train_loader = DataLoader(trans_data[split_idx["train"]], batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+                trans_valid_loader = DataLoader(trans_data[split_idx["valid"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
+                trans_test_loader = DataLoader(trans_data[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
+            else:
+                train_loader = DataLoader(dataset[split_idx["train"]], batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
+                
             valid_loader = DataLoader(dataset[split_idx["valid"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
             test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
 
             if args.gnn == 'gin':
                 model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False, rfParams=rfParams).to(device)
             elif args.gnn == 'gin-virtual':
-                model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+                model = GNN(gnn_type = 'gin', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True, rfParams=rfParams).to(device)
             elif args.gnn == 'gcn':
-                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False, rfParams=rfParams).to(device)
             elif args.gnn == 'gcn-virtual':
-                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+                model = GNN(gnn_type = 'gcn', num_tasks = dataset.num_tasks, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True, rfParams=rfParams).to(device)
+            elif args.gnn == 'gnn2':
+                model = GNN(gnn_type= 'gin', num_tasks=dataset.num_tasks, num_layer=args.num_layer, emb_dim=args.emb_dim, drop_ratio=args.drop_ratio, virtual_node=False, rfParams=rfParams, gnn2=True).to(device)
             else:
                 raise ValueError('Invalid GNN type')
 
@@ -183,12 +215,20 @@ def main():
                     test_loader = DataLoader(dataset[split_idx["test"]], batch_size=args.batch_size, shuffle=False, num_workers = args.num_workers)
                 print("=====Epoch {}".format(epoch))
                 print('Training...')
-                train(model, device, train_loader, optimizer, dataset.task_type)
+                if args.gnn == 'gnn2':
+                    train(model, device, train_loader, optimizer, dataset.task_type, trans_loader=trans_train_loader)
+                else:
+                    train(model, device, train_loader, optimizer, dataset.task_type)
 
                 print('Evaluating...')
-                train_perf = eval(model, device, train_loader, evaluator)
-                valid_perf = eval(model, device, valid_loader, evaluator)
-                test_perf = eval(model, device, test_loader, evaluator)
+                if args.gnn == 'gnn2':
+                    train_perf = eval(model, device, train_loader, evaluator, trans_loader=trans_train_loader)
+                    valid_perf = eval(model, device, valid_loader, evaluator, trans_loader=trans_valid_loader)
+                    test_perf = eval(model, device, test_loader, evaluator, trans_loader=trans_test_loader)
+                else:
+                    train_perf = eval(model, device, train_loader, evaluator)
+                    valid_perf = eval(model, device, valid_loader, evaluator)
+                    test_perf = eval(model, device, test_loader, evaluator)
 
                 print({'Train': train_perf, 'Validation': valid_perf, 'Test': test_perf})
 

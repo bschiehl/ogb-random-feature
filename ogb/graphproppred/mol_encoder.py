@@ -4,6 +4,25 @@ from ogb.utils.features import get_atom_feature_dims, get_bond_feature_dims
 full_atom_feature_dims = get_atom_feature_dims()
 full_bond_feature_dims = get_bond_feature_dims()
 
+class RFEncoder(torch.nn.Module):
+    def __init__(self, emb_dim, rfParams):
+        super(RFEncoder, self).__init__()
+
+        self.rf_embedding_list = torch.nn.ModuleList()
+        self.rfParams = rfParams
+
+        for i in range(rfParams['num_rf']):
+            emb = torch.nn.Embedding(rfParams['max_val'], emb_dim)
+            torch.nn.init.xavier_uniform_(emb.weight.data)
+            self.rf_embedding_list.append(emb)
+    
+    def forward(self, x):
+        x_embedding = 0
+        for i in range(x.shape[1]):
+            x_embedding += self.rf_embedding_list[i](x[:,i])
+        
+        return x_embedding
+
 class AtomEncoder(torch.nn.Module):
 
     def __init__(self, emb_dim, rfParams):
@@ -11,7 +30,7 @@ class AtomEncoder(torch.nn.Module):
         
         self.atom_embedding_list = torch.nn.ModuleList()
         self.rfParams = rfParams
-
+        # full_atom_feature_dims: [119, 4, 12, 12, 10, 6, 6, 2, 2]
         for i, dim in enumerate(full_atom_feature_dims):
             if rfParams is None or rfParams['emb']:
                 emb = torch.nn.Embedding(dim, emb_dim)
