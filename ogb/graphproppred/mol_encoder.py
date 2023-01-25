@@ -21,6 +21,7 @@ class RFEncoder(torch.nn.Module):
         for i in range(x.shape[1]):
             x_embedding += self.rf_embedding_list[i](x[:,i])
         
+        x_embedding = x_embedding % self.rfParams['max_val']
         return x_embedding
 
 class AtomEncoder(torch.nn.Module):
