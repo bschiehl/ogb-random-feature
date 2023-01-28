@@ -69,29 +69,6 @@ class GNN(torch.nn.Module):
             h_node_1 = torch.abs(h_node_1)
             h_node_1 = h_node_1 % self.rfParams['max_val']
             batched_data.x = torch.cat((batched_data.x, h_node_1.to(batched_data.x.device, batched_data.x.dtype)), dim=1)
-        
-        for i in range(batched_data.x.shape[1]):
-            maxi = torch.max(batched_data.x[:,i])
-            mini = torch.min(batched_data.x[:,i])
-            if mini < 0:
-                warnings.warn(f"negative value detected: {mini} in col {i}")
-            if i == 0 and maxi >= 119:
-                warnings.warn(f"value in col {i} bigger than 118")
-            elif i == 1 and maxi >= 4:
-                warnings.warn(f"value in col {i} bigger than 3")
-            elif (i == 2 or i == 3) and maxi >= 12:
-                warnings.warn(f"value in col {i} bigger than 11")
-            elif i == 4 and maxi >= 10:
-                warnings.warn(f"value in col {i} bigger than 9")
-            elif (i == 5 or i == 6) and maxi >= 6:
-                warnings.warn(f"value in col {i} bigger than 5")
-            elif (i == 7 or i == 8) and maxi >= 2:
-                warnings.warn(f"value in col {i} bigger than 1") 
-            elif (maxi >= 100):
-                warnings.warn(f"value in col {i} bigger than 99")
-            elif (i >= 25):
-                warnings.warn("too many columns")
-        
 
         h_node = self.gnn_node(batched_data)
 
