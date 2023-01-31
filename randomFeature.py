@@ -25,8 +25,8 @@ class RandomFeature(BaseTransform):
         cat (bool, optional): If set to :obj:`False`, existing node features
             will be replaced. (default: :obj:`True`)
         node_types (str or List[str], optional): The specified node type(s) to
-            append constant values for if used on heterogeneous graphs.
-            If set to :obj:`None`, constants will be added to each node feature
+            append random values for if used on heterogeneous graphs.
+            If set to :obj:`None`, random values will be added to each node feature
             :obj:`x` for all existing node types. (default: :obj:`None`)
         max_val (int, optional): Value to cap random values at.
             (default: :obj:`None`)
@@ -88,8 +88,6 @@ class RandomFeature(BaseTransform):
                     s = torch.sum(x, 1).view(-1,1).float()
                     z = torch.zeros((num_nodes, self.num_rf - 1))
                     s = torch.concat((s, z), 1)
-                    # another possibility: map [A,B] --> [a,b] with (x - A) * (b-a)/(B-A) + a
-                    # A = min(s), B = max(s)
                     if self.max_val is not None:
                         s = s % self.max_val
                     c[mask] = s[mask]
@@ -99,7 +97,6 @@ class RandomFeature(BaseTransform):
                         store.x = torch.cat([x, c.to(x.device, x.dtype)], dim=-1)
                 else:
                     store.x = c
-
         return data
 
     def __repr__(self) -> str:
