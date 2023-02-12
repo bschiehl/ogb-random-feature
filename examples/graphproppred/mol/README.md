@@ -8,7 +8,7 @@ This repository includes the scripts for GNN baselines for `ogbg-mol*` dataset.
 # Run with default config. For the imports to work correctly this should be executed in the parent directory of this repository.
 # $DATASET, $GNN_TYPE, and $FILENAME are described below.
 python -m ogb-random-feature.examples.graphproppred.mol.main_pyg --dataset $DATASET --gnn $GNN_TYPE --filename $FILENAME 
---randomFeature $RANDOMFEATURE
+(--randomFeature) (--randomEmbedding) (--replace)
 ```
 
 ### `$DATASET`
@@ -42,8 +42,14 @@ The last three datasets (`ogbg-molesol`, `ogbg-molfreesolv`, `ogbg-mollipo`) are
 ### `$FILENAME`: Specifying output files. 
 `$FILENAME` specifies the filename to save the result. The result is a dictionary containing (1) best training performance (`'BestTrain'`), (2) best validation performance (`'Val'`), (3) test performance at the best validation epoch (`'Test'`), and (4) training performance at the best validation epoch (`'Train'`).
 
-### `$RANDOMFEATURE`
-Boolean to specify whether to add random vertex features.
+### `--randomFeature`
+Use this option to add random vertex features (hyperparameters specified in main_pyg)
+
+### `--randomEmbedding`
+Use this option with --randomFeature to create extra embeddings for the random features. If this option is not used with --randomFeature, then the random features are concatenated to the original embeddings.
+
+### `--replace`
+Use this option to sample new random features in each epoch.
 
 ## Converting SMILES string into OGB graph object
 Molecules are typically represented as [SMILES strings](https://en.wikipedia.org/wiki/Simplified_molecular-input_line-entry_system).
